@@ -1,3 +1,7 @@
-1: https://www.kaggle.com/datasets/headsortails/us-natural-disaster-declarations?select=us_disasters_m5.csv
-2: https://www.kaggle.com/datasets/mubeenshehzadi/global-disaster-2018-2024
-3: https://www.kaggle.com/datasets/elvinrustam/global-disaster-events-20002025
+gd-1: https://www.kaggle.com/datasets/headsortails/us-natural-disaster-declarations?select=us_disasters_m5.csv
+gd-2: https://www.kaggle.com/datasets/mubeenshehzadi/global-disaster-2018-2024
+gd-3: https://www.kaggle.com/datasets/elvinrustam/global-disaster-events-20002025
+
+we-1: https://www.kaggle.com/datasets/sobhanmoosavi/us-weather-events
+
+re-1: https://www.kaggle.com/datasets/wardabilal/real-estate-price-insights
