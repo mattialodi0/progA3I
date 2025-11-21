@@ -1,6 +1,10 @@
-gd-1: https://www.kaggle.com/datasets/headsortails/us-natural-disaster-declarations?select=us_disasters_m5.csv
-gd-2: https://www.kaggle.com/datasets/mubeenshehzadi/global-disaster-2018-2024
-gd-3: https://www.kaggle.com/datasets/elvinrustam/global-disaster-events-20002025
+US_disaster_1: https://www.kaggle.com/datasets/headsortails/us-natural-disaster-declarations?select=us_disasters_m5.csv (1953-today)
+
+we_US_1: https://www.kaggle.com/datasets/sobhanmoosavi/us-weather-events (2016-2022) (No temperature)
+we_US_2: https://www.kaggle.com/datasets/nachiketkamod/weather-dataset-us (1992-2021) (8gb)
+
+gd-2: https://www.kaggle.com/datasets/mubeenshehzadi/global-disaster-2018-2024 (2018-2024)
+gd-3: https://www.kaggle.com/datasets/elvinrustam/global-disaster-events-20002025 (2000-2025)
 
 we-1: https://www.kaggle.com/datasets/sobhanmoosavi/us-weather-events
 
