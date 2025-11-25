@@ -1,1 +1,10 @@
-FEMA disasters prediction: https://github.com/xairen/DisasterPrediction
+Repos:
+- FEMA disasters prediction: https://github.com/xairen/DisasterPrediction
+
+Blogs:
+- https://saiwa.ai/blog/ai-and-natural-disaster-prediction/
+- https://blog.google/technology/ai/flood-forecasts-india-bangladesh/
+
+Articles:
+- CV flood forecasting: https://www.mdpi.com/2313-433X/11/2/32
+- interpretable ML: https://www.sciencedirect.com/science/article/pii/S1352231024004722 !!!

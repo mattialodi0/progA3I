@@ -1,3 +1,4 @@
+Explored:
 US_disaster_1: https://www.kaggle.com/datasets/headsortails/us-natural-disaster-declarations?select=us_disasters_m5.csv (1953-today)
 
 we_US_1: https://www.kaggle.com/datasets/sobhanmoosavi/us-weather-events (2016-2022) (No temperature)
@@ -9,3 +10,15 @@ gd-3: https://www.kaggle.com/datasets/elvinrustam/global-disaster-events-2000202
 we-1: https://www.kaggle.com/datasets/sobhanmoosavi/us-weather-events
 
 re-1: https://www.kaggle.com/datasets/wardabilal/real-estate-price-insights
+
+
+Not explored yet:
+eu weather datasets: https://www.ecad.eu/dailydata/predefinedseries.php
+eu climate datasets: https://cds.climate.copernicus.eu/datasets
+eu disasters: (requires auth request) https://eswd.eu/en?filter=%7B%22startCoordinates%22%3A%7B%7D%2C%22endCoordinates%22%3A%7B%7D%2C%22time%22%3A%7B%22amount%22%3A1%2C%22unit%22%3A%22y%22%7D%2C%22qualityLevels%22%3A%5B%5D%2C%22eventTypes%22%3A%5B%22AVALANCHE%22%5D%2C%22countries%22%3A%5B%5D%2C%22advancedFilters%22%3A%5B%5D%2C%22includeDeleted%22%3Afalse%7D
+eu floods: https://naturalhazards.eu/database
+
+global and us climate datasets: https://www.ncdc.noaa.gov/cdo-web/datasets
+us disasters dataset: https://www.ncei.noaa.gov/access/billions/, https://www.kaggle.com/datasets/landfallmotto/billiondollar-weather-and-climate-disasters
+
+global disasters datasets: https://doc.emdat.be/
