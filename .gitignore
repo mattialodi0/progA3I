@@ -1,5 +1,5 @@
 *.csv
 datasets/ECA&D/**/*.txt
 datasets/GCLC/**/*.tif
-datasets/GCLC/**/*.tiff
+datasets/GMTED2010/**
 NCEI_datasets/storm_events/StormEvents_details-ftp_v1.0_d2016_c20250818.zip
