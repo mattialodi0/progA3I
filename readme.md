@@ -11,9 +11,13 @@ The focus os the project is to implement a model capable of predicting the distr
 - Climate datasets: PRISM, ERA5-Land
 
 ### Features
+### Conditioning Features
 - ELEVATION: numeric in m
 - SLOPE: numeric
 - SEA_DISTANCE: numeric in km
+- ANNUAL_PRECIPITATION: numeric in mm
+- TMIN: numeric in °C
+- TMAX: numeric in °C
 
 ## Model
 
