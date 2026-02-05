@@ -8,6 +8,7 @@ The focus os the project is to implement a model capable of predicting the distr
 - US county dataset:
 - Land cover dataset: GCLC
 - Elevation dataset: GMTED
+- Climate datasets: PRISM, ERA5-Land
 
 ### Features
 - ELEVATION: numeric in m
