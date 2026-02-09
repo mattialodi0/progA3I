@@ -7,3 +7,4 @@ datasets/river_dataset/**
 datasets/climate_dataset/**
 datasets/climate_dataset_ext/**
 NCEI_datasets/storm_events/StormEvents_details-ftp_v1.0_d2016_c20250818.zip
+flow2_runs/**
