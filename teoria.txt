@@ -1,3 +1,0 @@
-1 dim, RoT for bandwith
-sequential multi dim
-Pearson self correlation to extract period data
