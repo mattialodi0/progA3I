@@ -112,7 +112,7 @@ def get_gaussian_lattice(device='cpu', n_rings=10, n_points=10):
     # Calculate radii corresponding to equidistant Gaussian probabilities
     # We slice probability space from 51% to 95%
     # This ensures we cover the 'meat' of the distribution and the tails
-    probs = torch.linspace(0.5+0.45/n_rings, 0.95, n_rings)
+    probs = torch.linspace(0.50, 0.95, n_rings)
     dist = torch.distributions.Normal(0, 1)
     radii = dist.icdf(probs) # Transform prob -> gaussian radius (sigma)
     max_r = radii[-1].item()
