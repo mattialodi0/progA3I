@@ -124,13 +124,21 @@ def run_inference_and_plot(flow, test_loader, y_scaler, target_cols, device):
     y_pred = y_scaler.inverse_transform(y_pred)
     y_pred = np.expm1(np.clip(y_pred, -20, None))
     y_true = np.expm1(np.clip(y_true, -20, None))
-    # Plot for the single target
-    plt.figure(figsize=(5,4))
+    # Plot for each target
+    plt.figure(figsize=(10,4))
+    plt.subplot(1,2,1)
     plt.scatter(y_true[:, 0], y_pred[:, 0], alpha=0.5)
     plt.xlabel(f"True {target_cols[0]}")
     plt.ylabel(f"Predicted {target_cols[0]}")
     plt.title(f"True vs Predicted: {target_cols[0]}")
     plt.plot([y_true[:, 0].min(), y_true[:, 0].max()], [y_true[:, 0].min(), y_true[:, 0].max()], 'r--')
+    plt.grid()
+    plt.subplot(1,2,2)
+    plt.scatter(y_true[:, 1], y_pred[:, 1], alpha=0.5)
+    plt.xlabel(f"True {target_cols[1]}")
+    plt.ylabel(f"Predicted {target_cols[1]}")
+    plt.title(f"True vs Predicted: {target_cols[1]}")
+    plt.plot([y_true[:, 1].min(), y_true[:, 1].max()], [y_true[:, 1].min(), y_true[:, 1].max()], 'r--')
     plt.grid()
     plt.show()
 
