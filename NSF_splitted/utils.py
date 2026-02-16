@@ -219,3 +219,10 @@ def get_gaussian_lattice(device='cpu', n_rings=10, n_points=10):
     colors_rgb = mcolors.hsv_to_rgb(c_tensor_hsv.cpu().numpy())
     
     return z_tensor.float().to(device), colors_rgb
+
+
+class TrainingHistory:
+    def __init__(self):
+        self.train_losses = []
+        self.val_losses = []
+        self.lrs = []
