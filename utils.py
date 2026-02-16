@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
+
 
 def load_disaster_dataset(data_dir):
     try:
@@ -164,3 +166,62 @@ def get_gaussian_lattice(device='cpu', n_rings=10, n_points=10):
     colors_rgb = mcolors.hsv_to_rgb(c_tensor_hsv.cpu().numpy())
     
     return z_tensor.float().to(device), colors_rgb
+
+def run_inference_and_plot(flow, test_loader, y_scaler, target_cols, device):
+    """
+    Run inference for the test set and plot results for damages and casualties
+     Parameters
+    ----------
+    flow        : trained zuko NSF
+    test_loader : iterable over the test set
+    y_scaler    : y_scaler to plot target feature in its standard input's form
+    target_cols : target columns to predict and plot
+    device      : device on which we want to work
+
+    Returns
+    n plots     : n = len(target_cols)
+    """
+
+    flow.eval()
+    y_true = []
+    y_pred = []
+    with torch.no_grad():
+        for x_batch, y_batch in test_loader:
+            x_batch = x_batch.to(device)
+            y_batch = y_batch.to(device)
+            dist = flow(x_batch)
+            y_hat = dist.sample()
+            # Ensure y_hat and y_batch are 2D
+            if y_hat.ndim == 1:
+                y_hat = y_hat.unsqueeze(1)
+            if y_batch.ndim == 1:
+                y_batch = y_batch.unsqueeze(1)
+            y_true.append(y_batch.cpu())
+            y_pred.append(y_hat.cpu())
+    y_true = torch.cat(y_true, dim=0).numpy()
+    y_pred = torch.cat(y_pred, dim=0).numpy()
+    if y_true.ndim == 1:
+        y_true = y_true.reshape(-1, 1)
+    if y_pred.ndim == 1:
+        y_pred = y_pred.reshape(-1, 1)
+    y_true = y_scaler.inverse_transform(y_true)
+    y_pred = y_scaler.inverse_transform(y_pred)
+    y_pred = np.expm1(np.clip(y_pred, -20, None))
+    y_true = np.expm1(np.clip(y_true, -20, None))
+    # Plot for each target
+    plt.figure(figsize=(10,4))
+    plt.subplot(1,2,1)
+    plt.scatter(y_true[:, 0], y_pred[:, 0], alpha=0.5)
+    plt.xlabel(f"True {target_cols[0]}")
+    plt.ylabel(f"Predicted {target_cols[0]}")
+    plt.title(f"True vs Predicted: {target_cols[0]}")
+    plt.plot([y_true[:, 0].min(), y_true[:, 0].max()], [y_true[:, 0].min(), y_true[:, 0].max()], 'r--')
+    plt.grid()
+    plt.subplot(1,2,2)
+    plt.scatter(y_true[:, 1], y_pred[:, 1], alpha=0.5)
+    plt.xlabel(f"True {target_cols[1]}")
+    plt.ylabel(f"Predicted {target_cols[1]}")
+    plt.title(f"True vs Predicted: {target_cols[1]}")
+    plt.plot([y_true[:, 1].min(), y_true[:, 1].max()], [y_true[:, 1].min(), y_true[:, 1].max()], 'r--')
+    plt.grid()
+    plt.show()
