@@ -2,6 +2,29 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import torch
 import numpy as np
+from pathlib import Path
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from torch.utils.data import TensorDataset
+
+
+# constants
+
+DATASET_PATH = Path("../datasets/disasters_merged_all_feats.csv")
+TARGET_COLS = ["DAMAGES", "CASUALTIES"]
+X_COLS = [
+    'BEGIN_LAT', 'BEGIN_LON',
+    'DURATION_HOURS', 
+    'TIME_DAY_SIN', 'TIME_DAY_COS', 'TIME_YEAR_NORM',
+    'PRECIPITATION', 'TMIN', 'TMAX',
+    'ELEVATION', 'SLOPE',
+    'COV_BARREN', 'COV_CULTIVATED', 'COV_VEGETATION',
+    'COV_FOREST', 'COV_WATER', 'COV_SNOW_ICE', 'COV_URBAN',
+    'RIVER_DISTANCE', 'SEA_DISTANCE',
+]
+VAR_X_COLS = ['WIND_SPEED', 'HAIL_SIZE']
+
+# functions
 
 def load_disaster_dataset(data_dir):
     try:
@@ -80,9 +103,7 @@ disaster_events_group_map = {
     'Dense Fog':  'Fog',
     'Marine Dense Fog':  'Fog'
 }
-
-
-# 
+ 
 def run_inference_and_plot(flow, test_loader, y_scaler, target_cols, device):
     """
     Run inference for the test set and plot results for damages and casualties
@@ -141,8 +162,6 @@ def run_inference_and_plot(flow, test_loader, y_scaler, target_cols, device):
     plt.plot([y_true[:, 1].min(), y_true[:, 1].max()], [y_true[:, 1].min(), y_true[:, 1].max()], 'r--')
     plt.grid()
     plt.show()
-
-
 
 
 def get_gaussian_lattice(device='cpu', n_rings=10, n_points=10):
@@ -230,9 +249,120 @@ def get_gaussian_lattice(device='cpu', n_rings=10, n_points=10):
     
     return z_tensor.float().to(device), colors_rgb
 
+def get_all_disaster_events_group_df():
+    df = pd.read_csv(DATASET_PATH)
+    return {
+        'Hail': df[df['EVENT_GROUP'] == 'Hail'].drop(columns=['EVENT_GROUP', 'WIND_SPEED']),
+        'Wind': df[df['EVENT_GROUP'] == 'Wind'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Storm': df[df['EVENT_GROUP'] == 'Storm'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Flood': df[df['EVENT_GROUP'] == 'Flood'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Freeze': df[df['EVENT_GROUP'] == 'Freeze'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Drought': df[df['EVENT_GROUP'] == 'Drought'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Snow': df[df['EVENT_GROUP'] == 'Snow'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Heat': df[df['EVENT_GROUP'] == 'Heat'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Heavy Rain': df[df['EVENT_GROUP'] == 'Heavy Rain'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Fog': df[df['EVENT_GROUP'] == 'Fog'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Wildfire': df[df['EVENT_GROUP'] == 'Wildfire'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Lightning': df[df['EVENT_GROUP'] == 'Lightning'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Debris Flow': df[df['EVENT_GROUP'] == 'Debris Flow'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Avalanche': df[df['EVENT_GROUP'] == 'Avalanche'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+    }   
+
+def get_disaster_events_group_df(group_name):
+    all_groups = get_all_disaster_events_group_df()
+    if isinstance(group_name, str):
+        return all_groups[group_name]
+    elif isinstance(group_name, list):
+        all_groups = get_all_disaster_events_group_df()
+        return {group: all_groups[group] for group in group_name}
+
+def get_datasets_from_dataframes(dfs):
+    dss = {}
+    for group, df in dfs.items():
+        if group != 'Hail': 
+            c = X_COLS + [VAR_X_COLS[0]]
+            X = df[c].values.astype(np.float32)
+            Y = df[TARGET_COLS].values.astype(np.float32)
+            dss[group] = (X,Y)
+        else:
+            c = X_COLS + [VAR_X_COLS[1]]
+            X = df[c].values.astype(np.float32)
+            Y = df[TARGET_COLS].values.astype(np.float32)
+            dss[group] = (X,Y)
+
+    return dss
+
+def split_normalize_datasets(dss, device='cpu'):
+    dss1 = {}
+    for group, xy in dss.items():
+        X,Y = xy
+
+        Y = np.log1p(Y)
+        X_train, X_temp, Y_train, Y_temp = train_test_split(X, Y, test_size=0.3, random_state=42)
+        X_val, X_test, Y_val, Y_test = train_test_split(X_temp, Y_temp, test_size=0.5, random_state=42)
+        
+        x_scaler = StandardScaler()
+        y_scaler = StandardScaler()
+        X_train = x_scaler.fit_transform(X_train)
+        X_val   = x_scaler.transform(X_val)
+        X_test  = x_scaler.transform(X_test)
+        Y_train = y_scaler.fit_transform(Y_train)
+        Y_val   = y_scaler.transform(Y_val)
+        Y_test  = y_scaler.transform(Y_test)
+
+        X_train = torch.tensor(X_train).to(device)
+        Y_train = torch.tensor(Y_train).to(device)
+        X_val = torch.tensor(X_val).to(device)
+        Y_val = torch.tensor(Y_val).to(device)
+        X_test = torch.tensor(X_test).to(device)
+        Y_test = torch.tensor(Y_test).to(device)
+
+        train_ds = TensorDataset(X_train, Y_train)
+        val_ds   = TensorDataset(X_val, Y_val)
+        test_ds   = TensorDataset(X_test, Y_test)
+
+        dss1[group] = {
+            'train': train_ds,
+            'val': val_ds,
+            'test': test_ds,
+            'x_scaler': x_scaler,
+            'y_scaler': y_scaler
+        }
+    return dss1
+
+def compute_avg_true_pred_diff(flow, test_loader, y_scaler, device):
+    flow.eval()
+    y_true = []
+    y_pred = []
+    with torch.no_grad():
+        for x_batch, y_batch in test_loader:
+            x_batch = x_batch.to(device)
+            y_batch = y_batch.to(device)
+            dist = flow(x_batch)
+            y_hat = dist.sample().squeeze()
+            y_true.append(y_batch.cpu())
+            y_pred.append(y_hat.cpu())
+    y_true = torch.cat(y_true, dim=0).numpy()
+    y_pred = torch.cat(y_pred, dim=0).numpy()
+    if y_true.ndim == 1:
+        y_true = y_true.reshape(-1, 1)
+    if y_pred.ndim == 1:
+        y_pred = y_pred.reshape(-1, 1)
+    y_true = y_scaler.inverse_transform(y_true)
+    y_pred = y_scaler.inverse_transform(y_pred)
+    y_pred = np.expm1(np.clip(y_pred, -20, None))
+    y_true = np.expm1(np.clip(y_true, -20, None))
+    y_pred[:, 1] = np.floor(y_pred[:, 1]).clip(min=0)
+    avg_diff_damages = np.mean(np.abs(y_true[:, 0] - y_pred[:, 0]))
+    avg_diff_casualties = np.mean(np.abs(y_true[:, 1] - y_pred[:, 1]))
+    return avg_diff_damages, avg_diff_casualties
+
+
+# classes
 
 class TrainingHistory:
     def __init__(self):
         self.train_losses = []
         self.val_losses = []
         self.lrs = []
+
