@@ -1,0 +1,368 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import torch
+import numpy as np
+from pathlib import Path
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from torch.utils.data import TensorDataset
+
+
+# constants
+
+DATASET_PATH = Path("../datasets/disasters_merged_all_feats.csv")
+TARGET_COLS = ["DAMAGES", "CASUALTIES"]
+X_COLS = [
+    'BEGIN_LAT', 'BEGIN_LON',
+    'DURATION_HOURS', 
+    'TIME_DAY_SIN', 'TIME_DAY_COS', 'TIME_YEAR_NORM',
+    'PRECIPITATION', 'TMIN', 'TMAX',
+    'ELEVATION', 'SLOPE',
+    'COV_BARREN', 'COV_CULTIVATED', 'COV_VEGETATION',
+    'COV_FOREST', 'COV_WATER', 'COV_SNOW_ICE', 'COV_URBAN',
+    'RIVER_DISTANCE', 'SEA_DISTANCE',
+]
+VAR_X_COLS = ['WIND_SPEED', 'HAIL_SIZE']
+
+# functions
+
+def load_disaster_dataset(data_dir):
+    try:
+        files = [
+            data_dir / 'StormEvents_details-ftp_v1.0_d2016_c20250818.csv',
+            data_dir / 'StormEvents_details-ftp_v1.0_d2017_c20250520.csv',
+            data_dir / 'StormEvents_details-ftp_v1.0_d2018_c20250520.csv',
+            data_dir / 'StormEvents_details-ftp_v1.0_d2019_c20250520.csv',
+            data_dir / 'StormEvents_details-ftp_v1.0_d2020_c20251118.csv',
+            data_dir / 'StormEvents_details-ftp_v1.0_d2021_c20250520.csv',
+            data_dir / 'StormEvents_details-ftp_v1.0_d2022_c20250721.csv',
+        ]
+        df_list = []
+        for file in files:
+            df = pd.read_csv(file)
+            df_list.append(df)
+
+        
+        df = pd.concat(df_list, ignore_index=True)
+    except Exception as e:
+        print(f"Error loading datasets: {e}")
+        return None
+    
+    return df
+
+
+def damage_to_numeric(damage_str):
+    if pd.isna(damage_str):
+        return 0
+    multipliers = {'K': 1_000, 'M': 1_000_000, 'B': 1_000_000_000}
+    if damage_str[-1] in multipliers:
+        try:
+            value = float(damage_str[:-1])
+            return value * multipliers[damage_str[-1]]
+        except ValueError:
+            return 0
+    try:
+        return float(damage_str)
+    except ValueError:
+        return 0  
+
+disaster_events_group_map = {
+    'Thunderstorm Wind': 'Wind',
+    'Hail': 'Hail',
+    'Marine Hail': 'Hail',
+    'Flood': 'Flood',
+    'Flash Flood': 'Flood',
+    'Coastal Flood': 'Flood',
+    'Lakeshore Flood': 'Flood',
+    'Winter Weather': 'Freeze',
+    'Extreme Cold/Wind Chill': 'Freeze',
+    'Frost/Freeze': 'Freeze',
+    'Cold/Wind Chill': 'Freeze',
+    'Freezing Fog': 'Freeze',
+    'Heat': 'Heat',
+    'Excessive Heat': 'Heat',
+    'Heavy Snow': 'Snow',
+    'Blizzard': 'Snow',
+    'Lake-Effect Snow': 'Snow',
+    'Sleet': 'Snow',
+    'Winter Storm': 'Storm',
+    'Marine Thunderstorm Wind': 'Storm',
+    'Tornado': 'Storm',
+    'Tropical Storm': 'Storm',
+    'Dust Storm': 'Storm',
+    'Funnel Cloud': 'Storm',
+    'Ice Storm': 'Storm',
+    'Waterspout': 'Storm',
+    'Marine Tropical Storm': 'Storm',
+    'Hurricane (Typhoon)': 'Storm',
+    'Marine Hurricane/Typhoon': 'Storm',
+    'High Wind':  'Wind',
+    'Strong Wind':  'Wind',
+    'Marine High Wind':  'Wind',
+    'Marine Strong Wind':  'Wind',
+    'Dense Fog':  'Fog',
+    'Marine Dense Fog':  'Fog'
+}
+ 
+def run_inference_and_plot(flow, test_loader, y_scaler, target_cols, device):
+    """
+    Run inference for the test set and plot results for damages and casualties
+     Parameters
+    ----------
+    flow        : trained zuko NSF
+    test_loader : iterable over the test set
+    y_scaler    : y_scaler to plot target feature in its standard input's form
+    target_cols : target columns to predict and plot
+    device      : device on which we want to work
+
+    Returns
+    n plots     : n = len(target_cols)
+    """
+
+    flow.eval()
+    y_true = []
+    y_pred = []
+    with torch.no_grad():
+        for x_batch, y_batch in test_loader:
+            x_batch = x_batch.to(device)
+            y_batch = y_batch.to(device)
+            dist = flow(x_batch)
+            y_hat = dist.sample()
+            # Ensure y_hat and y_batch are 2D
+            if y_hat.ndim == 1:
+                y_hat = y_hat.unsqueeze(1)
+            if y_batch.ndim == 1:
+                y_batch = y_batch.unsqueeze(1)
+            y_true.append(y_batch.cpu())
+            y_pred.append(y_hat.cpu())
+    y_true = torch.cat(y_true, dim=0).numpy()
+    y_pred = torch.cat(y_pred, dim=0).numpy()
+    if y_true.ndim == 1:
+        y_true = y_true.reshape(-1, 1)
+    if y_pred.ndim == 1:
+        y_pred = y_pred.reshape(-1, 1)
+    y_true = y_scaler.inverse_transform(y_true)
+    y_pred = y_scaler.inverse_transform(y_pred)
+    y_pred = np.expm1(np.clip(y_pred, -20, None))
+    y_true = np.expm1(np.clip(y_true, -20, None))
+    # Plot for each target
+    plt.figure(figsize=(10,4))
+    plt.subplot(1,2,1)
+    plt.scatter(y_true[:, 0], y_pred[:, 0], alpha=0.5)
+    plt.xlabel(f"True {target_cols[0]}")
+    plt.ylabel(f"Predicted {target_cols[0]}")
+    plt.title(f"True vs Predicted: {target_cols[0]}")
+    plt.plot([y_true[:, 0].min(), y_true[:, 0].max()], [y_true[:, 0].min(), y_true[:, 0].max()], 'r--')
+    plt.grid()
+    plt.subplot(1,2,2)
+    plt.scatter(y_true[:, 1], y_pred[:, 1], alpha=0.5)
+    plt.xlabel(f"True {target_cols[1]}")
+    plt.ylabel(f"Predicted {target_cols[1]}")
+    plt.title(f"True vs Predicted: {target_cols[1]}")
+    plt.plot([y_true[:, 1].min(), y_true[:, 1].max()], [y_true[:, 1].min(), y_true[:, 1].max()], 'r--')
+    plt.grid()
+    plt.show()
+
+
+def get_gaussian_lattice(device='cpu', n_rings=10, n_points=10):
+    """
+    Generates a fixed 101-point lattice for 2D flow visualization.
+    
+    Structure:
+    - 1 Center point (0,0)
+    - n Rings of k points each
+    - Radii based on Gaussian probability intervals
+    - Alternating phase shift (0, 2pi/k) between rings
+    
+    Returns:
+        z (Tensor): [1+n*k, 2] inputs for the flow inverse.
+        colors (Array): [1+n*k, 3] RGB values for plotting the output.
+    """
+
+    import torch
+    import matplotlib.colors as mcolors
+
+    points = []
+    colors_hsv = []
+
+    # --- 1. The Center (Point 0) ---
+    points.append([0.0, 0.0])
+    # Color: White (Saturation=0, Value=1)
+    colors_hsv.append([0.0, 0.0, 1.0]) 
+
+    # --- 2. The 10 Rings ---
+    phase_shift = np.pi / n_points  # Alternating shift
+    
+    # Calculate radii corresponding to equidistant Gaussian probabilities
+    # We slice probability space from 51% to 95%
+    # This ensures we cover the 'meat' of the distribution and the tails
+    probs = torch.linspace(0.50, 0.95, n_rings)
+    dist = torch.distributions.Normal(0, 1)
+    radii = dist.icdf(probs) # Transform prob -> gaussian radius (sigma)
+    max_r = radii[-1].item()
+
+    for i, r in enumerate(radii):
+        r = r.item()
+        
+        # Alternating phase: Even rings start at 0, Odd rings start at pi/20
+        # (i starts at 0, so ring 1 is index 0)
+        current_phase = phase_shift if (i % 2 != 0) else 0.0
+        
+        # Generate 10 angles for this ring
+        angles = torch.linspace(0, 2*np.pi, n_points + 1)[:-1] + current_phase
+        
+        # Polar -> Cartesian
+        x = r * torch.cos(angles)
+        y = r * torch.sin(angles)
+        
+        # Append points
+        ring_points = torch.stack([x, y], dim=1)
+        points.append(ring_points)
+        
+        # --- Color Logic (Polar -> HSV) ---
+        # Hue = Angle (normalized 0-1)
+        # Saturation = Radius (normalized 0-1)
+        # Value = 1.0 (Max brightness)
+        
+        # Normalize angles to [0, 1] for Hue
+        # We use modulo to strictly keep it in range
+        hues = (angles % (2*np.pi)) / (2*np.pi)
+        
+        # Saturation increases with radius (White center -> Vivid edge)
+        saturation = r / (max_r * 1.1) # Divide by slightly more than max to avoid clipping
+        saturations = torch.full_like(hues, saturation)
+        
+        values = torch.ones_like(hues) # Full brightness
+        
+        # Stack HSV for this ring
+        ring_hsv = torch.stack([hues, saturations, values], dim=1)
+        colors_hsv.append(ring_hsv)
+
+    # --- 3. Assemble Final Tensors ---
+    # Concatenate all lists into single tensors
+    z_tensor = torch.cat([torch.tensor(points[:1]), torch.cat(points[1:])], dim=0)
+    c_tensor_hsv = torch.cat([torch.tensor(colors_hsv[:1]), torch.cat(colors_hsv[1:])], dim=0)
+    
+    # SAFETY: Clamp HSV values to [0, 1] to prevent matplotlib errors
+    c_tensor_hsv = torch.clamp(c_tensor_hsv, 0, 1)
+    colors_rgb = mcolors.hsv_to_rgb(c_tensor_hsv.cpu().numpy())
+    
+    return z_tensor.float().to(device), colors_rgb
+
+def get_all_disaster_events_group_df():
+    df = pd.read_csv(DATASET_PATH)
+    return {
+        'Hail': df[df['EVENT_GROUP'] == 'Hail'].drop(columns=['EVENT_GROUP', 'WIND_SPEED']),
+        'Wind': df[df['EVENT_GROUP'] == 'Wind'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Storm': df[df['EVENT_GROUP'] == 'Storm'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Flood': df[df['EVENT_GROUP'] == 'Flood'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Freeze': df[df['EVENT_GROUP'] == 'Freeze'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Drought': df[df['EVENT_GROUP'] == 'Drought'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Snow': df[df['EVENT_GROUP'] == 'Snow'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Heat': df[df['EVENT_GROUP'] == 'Heat'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Heavy Rain': df[df['EVENT_GROUP'] == 'Heavy Rain'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Fog': df[df['EVENT_GROUP'] == 'Fog'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Wildfire': df[df['EVENT_GROUP'] == 'Wildfire'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Lightning': df[df['EVENT_GROUP'] == 'Lightning'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Debris Flow': df[df['EVENT_GROUP'] == 'Debris Flow'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+        'Avalanche': df[df['EVENT_GROUP'] == 'Avalanche'].drop(columns=['EVENT_GROUP', 'HAIL_SIZE']),
+    }   
+
+def get_disaster_events_group_df(group_name):
+    all_groups = get_all_disaster_events_group_df()
+    if isinstance(group_name, str):
+        return all_groups[group_name]
+    elif isinstance(group_name, list):
+        all_groups = get_all_disaster_events_group_df()
+        return {group: all_groups[group] for group in group_name}
+
+def get_datasets_from_dataframes(dfs):
+    dss = {}
+    for group, df in dfs.items():
+        if group != 'Hail': 
+            c = X_COLS + [VAR_X_COLS[0]]
+            X = df[c].values.astype(np.float32)
+            Y = df[TARGET_COLS].values.astype(np.float32)
+            dss[group] = (X,Y)
+        else:
+            c = X_COLS + [VAR_X_COLS[1]]
+            X = df[c].values.astype(np.float32)
+            Y = df[TARGET_COLS].values.astype(np.float32)
+            dss[group] = (X,Y)
+
+    return dss
+
+def split_normalize_datasets(dss, device='cpu'):
+    dss1 = {}
+    for group, xy in dss.items():
+        X,Y = xy
+
+        Y = np.log1p(Y)
+        X_train, X_temp, Y_train, Y_temp = train_test_split(X, Y, test_size=0.3, random_state=42)
+        X_val, X_test, Y_val, Y_test = train_test_split(X_temp, Y_temp, test_size=0.5, random_state=42)
+        
+        x_scaler = StandardScaler()
+        y_scaler = StandardScaler()
+        X_train = x_scaler.fit_transform(X_train)
+        X_val   = x_scaler.transform(X_val)
+        X_test  = x_scaler.transform(X_test)
+        Y_train = y_scaler.fit_transform(Y_train)
+        Y_val   = y_scaler.transform(Y_val)
+        Y_test  = y_scaler.transform(Y_test)
+
+        X_train = torch.tensor(X_train).to(device)
+        Y_train = torch.tensor(Y_train).to(device)
+        X_val = torch.tensor(X_val).to(device)
+        Y_val = torch.tensor(Y_val).to(device)
+        X_test = torch.tensor(X_test).to(device)
+        Y_test = torch.tensor(Y_test).to(device)
+
+        train_ds = TensorDataset(X_train, Y_train)
+        val_ds   = TensorDataset(X_val, Y_val)
+        test_ds   = TensorDataset(X_test, Y_test)
+
+        dss1[group] = {
+            'train': train_ds,
+            'val': val_ds,
+            'test': test_ds,
+            'x_scaler': x_scaler,
+            'y_scaler': y_scaler
+        }
+    return dss1
+
+def compute_avg_true_pred_diff(flow, test_loader, y_scaler, device):
+    flow.eval()
+    y_true = []
+    y_pred = []
+    with torch.no_grad():
+        for x_batch, y_batch in test_loader:
+            x_batch = x_batch.to(device)
+            y_batch = y_batch.to(device)
+            dist = flow(x_batch)
+            y_hat = dist.sample().squeeze()
+            y_true.append(y_batch.cpu())
+            y_pred.append(y_hat.cpu())
+    y_true = torch.cat(y_true, dim=0).numpy()
+    y_pred = torch.cat(y_pred, dim=0).numpy()
+    if y_true.ndim == 1:
+        y_true = y_true.reshape(-1, 1)
+    if y_pred.ndim == 1:
+        y_pred = y_pred.reshape(-1, 1)
+    y_true = y_scaler.inverse_transform(y_true)
+    y_pred = y_scaler.inverse_transform(y_pred)
+    y_pred = np.expm1(np.clip(y_pred, -20, None))
+    y_true = np.expm1(np.clip(y_true, -20, None))
+    y_pred[:, 1] = np.floor(y_pred[:, 1]).clip(min=0)
+    avg_diff_damages = np.mean(np.abs(y_true[:, 0] - y_pred[:, 0]))
+    avg_diff_casualties = np.mean(np.abs(y_true[:, 1] - y_pred[:, 1]))
+    return avg_diff_damages, avg_diff_casualties
+
+
+# classes
+
+class TrainingHistory:
+    def __init__(self):
+        self.train_losses = []
+        self.val_losses = []
+        self.lrs = []
+
