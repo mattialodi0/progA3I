@@ -225,3 +225,5 @@ def run_inference_and_plot(flow, test_loader, y_scaler, target_cols, device):
     plt.plot([y_true[:, 1].min(), y_true[:, 1].max()], [y_true[:, 1].min(), y_true[:, 1].max()], 'r--')
     plt.grid()
     plt.show()
+
+
