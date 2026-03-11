@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Predict</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+      #map { height: 420px; margin: 0.5rem 0 1rem 0; }
+      label { display: inline-block; margin: 0.25rem 1rem 0.25rem 0; }
+      body { font-family: Arial, sans-serif; margin: 1.5rem; }
+      fieldset { margin-top: 0.75rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Predict</h1>
+    <form id="predict-form">
+      <div>
+        <label>EVENT_TYPE:
+          <select name="EVENT_TYPE" required>
+            <option value="flood">flood</option>
+            <option value="storm">storm</option>
+            <option value="wildfire">wildfire</option>
+            <option value="drought">drought</option>
+          </select>
+        </label>
+      </div>
+
+      <!-- Map picker: click to set BEGIN_LAT/BEGIN_LON -->
+      <div id="map"></div>
+
+      <div>
+        <label>BEGIN_LAT: <input id="BEGIN_LAT" name="BEGIN_LAT" type="number" step="any" required readonly placeholder="click map"></label>
+        <label>BEGIN_LON: <input id="BEGIN_LON" name="BEGIN_LON" type="number" step="any" required readonly placeholder="click map"></label>
+      </div>
+
+      <div>
+        <label>DURATION_HOURS: <input name="DURATION_HOURS" type="number" step="any" value="1" required></label>
+        <label>WIND_SPEED: <input name="WIND_SPEED" type="number" step="any" value="0" required></label>
+      </div>
+      <div>
+        <label>DATE: <input name="DATE" type="date" value="2023-01-01" required></label>
+        <label>PRECIPITATION: <input name="PRECIPITATION" type="number" step="any" value="100" required></label>
+      </div>
+      <div>
+        <label>TMIN: <input name="TMIN" type="number" step="any" value="0" required></label>
+        <label>TMAX: <input name="TMAX" type="number" step="any" value="30" required></label>
+      </div>
+      <div>
+        <label>ELEVATION: <input name="ELEVATION" type="number" step="any" value="100" required></label>
+        <label>SLOPE: <input name="SLOPE" type="number" step="any" value="0" required></label>
+      </div>
+      <fieldset>
+        <legend>Land cover fractions (must sum to 1)</legend>
+        <label>COV_BARREN: <input name="COV_BARREN" type="number" step="any" min="0" max="1" value="0" required></label>
+        <label>COV_CULTIVATED: <input name="COV_CULTIVATED" type="number" step="any" min="0" max="1" value="0" required></label>
+        <label>COV_VEGETATION: <input name="COV_VEGETATION" type="number" step="any" min="0" max="1" value="1" required></label>
+        <label>COV_FOREST: <input name="COV_FOREST" type="number" step="any" min="0" max="1" value="0" required></label>
+        <label>COV_WATER: <input name="COV_WATER" type="number" step="any" min="0" max="1" value="0" required></label>
+        <label>COV_SNOW_ICE: <input name="COV_SNOW_ICE" type="number" step="any" min="0" max="1" value="0" required></label>
+        <label>COV_URBAN: <input name="COV_URBAN" type="number" step="any" min="0" max="1" value="0" required></label>
+      </fieldset>
+
+      <div>
+        <label>RIVER_DISTANCE: <input name="RIVER_DISTANCE" type="number" step="any" value="10" required></label>
+        <label>SEA_DISTANCE: <input name="SEA_DISTANCE" type="number" step="any" value="100" required></label>
+      </div>
+
+      <div style="margin-top:10px;">
+        <button type="submit">Submit</button>
+      </div>
+    </form>
+
+    <div id="form-error" style="color:#900;margin-top:8px;"></div>
+    
+    <h2>Result</h2>
+    <pre id="result" style="background:#f6f6f6;padding:10px;border:1px solid #ddd;">No result yet</pre>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+      // Initialize Leaflet map centered on the contiguous United States
+      const map = L.map('map').setView([39.8283, -98.5795], 4);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      let marker = null;
+      function setMarker(lat, lon){
+        if(marker){ marker.setLatLng([lat, lon]); }
+        else { marker = L.marker([lat, lon]).addTo(map); }
+        // update inputs
+        const latInput = document.getElementById('BEGIN_LAT');
+        const lonInput = document.getElementById('BEGIN_LON');
+        if(latInput) latInput.value = Number(lat).toFixed(6);
+        if(lonInput) lonInput.value = Number(lon).toFixed(6);
+      }
+
+      map.on('click', function(e){
+        const lat = e.latlng.lat;
+        const lon = e.latlng.lng;
+        setMarker(lat, lon);
+      });
+
+      // try to place a default marker
+      setMarker(39.8283, -98.5795);
+
+      // Form handling and validation
+      const form = document.getElementById('predict-form');
+      const result = document.getElementById('result');
+      const formError = document.getElementById('form-error');
+
+      function parseNumber(v){
+        const n = parseFloat(v);
+        return Number.isFinite(n) ? n : null;
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        formError.textContent = '';
+
+        // Validate cov sum
+        const covNames = ['COV_BARREN','COV_CULTIVATED','COV_VEGETATION','COV_FOREST','COV_WATER','COV_SNOW_ICE','COV_URBAN'];
+        let sum = 0.0;
+        for(const name of covNames){
+          const v = form.elements[name].value;
+          const n = parseNumber(v);
+          if(n === null){
+            formError.textContent = 'All coverage fields must be numeric.';
+            return;
+          }
+          if(n < 0){
+            formError.textContent = 'Coverage fractions must be >= 0.';
+            return;
+          }
+          sum += n;
+        }
+        if(Math.abs(sum - 1.0) > 1e-3){
+          formError.textContent = 'Coverage fractions must sum to 1 (currently ' + sum.toFixed(4) + ').';
+          return;
+        }
+
+        const formData = new FormData(form);
+        const resp = await fetch('/predict', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await resp.json();
+        if(!resp.ok){
+          formError.textContent = data.error || 'Server returned an error';
+        }
+        console.log('Response:', resp);
+        result.textContent = JSON.stringify(data, null, 2);
+      });
+    </script>
+  </body>
+</html>
