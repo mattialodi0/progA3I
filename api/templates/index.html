@@ -75,6 +75,9 @@
     
     <h2>Result</h2>
     <pre id="result" style="background:#f6f6f6;padding:10px;border:1px solid #ddd;">No result yet</pre>
+    <div style="margin-top:8px;">
+      <img id="plot-img" alt="predictive plot" style="max-width:100%;height:auto;display:none;border:1px solid #ccc;padding:6px;background:#fff;" />
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
@@ -149,8 +152,15 @@
         if(!resp.ok){
           formError.textContent = data.error || 'Server returned an error';
         }
-        console.log('Response:', resp);
+        console.log('Response:', data);
         result.textContent = JSON.stringify(data, null, 2);
+        const img = document.getElementById('plot-img');
+        if(data && data.prediction && data.prediction.plot){
+          img.src = data.prediction.plot;
+          img.style.display = 'block';
+        } else {
+          img.style.display = 'none';
+        }
       });
     </script>
   </body>
